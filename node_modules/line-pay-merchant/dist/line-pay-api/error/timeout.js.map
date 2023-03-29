@@ -1,0 +1,1 @@
+{"version":3,"file":"timeout.js","sourceRoot":"","sources":["../../../src/line-pay-api/error/timeout.ts"],"names":[],"mappings":";;;AAAA,MAAa,YAAa,SAAQ,KAAK;IACrC,YAAY,OAAe;QACzB,KAAK,CAAC,OAAO,CAAC,CAAA;IAChB,CAAC;CACF;AAJD,oCAIC;AAED,SAAgB,cAAc,CAAC,KAAc;IAC3C,OAAO,KAAK,YAAY,YAAY,CAAA;AACtC,CAAC;AAFD,wCAEC"}
