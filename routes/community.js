@@ -63,6 +63,8 @@ const getListData = async (req, res) => {
     [CMA] = await db.query(sql1);
 
 
+
+
     //取得該篇文章的按讚數
     // let communitylike = []
     // const sql2 = `SELECT COUNT(1) AS totalL FROM \`community\` JOIN community_liked ON  community.sid = community_liked.community_liked WHERE community.member_sid`;
@@ -130,7 +132,7 @@ const getoneCommunityData = async (req, res) => {
 const getoneCommunityReply = async (req, res) => {
     let row21 = []
     let row22 = []
-    const sql5 = 
+    const sql5 =
         `SELECT community_message.* , members.member_name, members.member_img FROM \`community_message\` 
 LEFT JOIN members on community_message.member_sid = members.sid WHERE community_message.community_sid = ${req.params.sid} `;
     [row21] = await db.query(sql5);
@@ -138,7 +140,7 @@ LEFT JOIN members on community_message.member_sid = members.sid WHERE community_
     const sqls = `SELECT COUNT(community_message.community_like) AS CMlike FROM community_message WHERE community_sid = ${req.params.sid}`;
     [row22] = await db.query(sqls)
 
-let row2 = [...row21,row22]
+    let row2 = [...row21, row22]
 
     return {
         row2
@@ -156,6 +158,37 @@ router.get("/api", async (req, res) => {
     res.json(await getListData(req));
 });
 
+//關鍵字搜尋文章標題
+router.get('/api/search', (req, res) => {
+    // 獲取關鍵字參數
+    const searchTerm = req.query.searchTerm;
+
+    // 編寫SQL預處理語句
+    const sql = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community_header LIKE ?`;
+    const searchTermLike = `%${searchTerm}%`;
+
+    
+    // 執行SQL查詢
+    db.query(sql, [searchTermLike], (err, results) => {
+        if (err) throw err;
+        res.json(results);
+    });
+});
+
+router.get('/data', async (req, res) => {
+    // 獲取關鍵字參數
+    const searchTerm = req.query.searchTerm;
+
+    // 編寫參數化的 SQL 語句
+    const sql = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community_header LIKE ?`;
+
+    // 執行 SQL 查詢
+    const [results] = await db.query(sql, [`%${searchTerm}%`]);
+
+    res.json(results);
+});
+
+
 //文章單頁資料
 router.get("/:sid", async (req, res) => {
     res.json(await getoneCommunityData(req));
@@ -170,8 +203,8 @@ router.get("/reply/:sid", async (req, res) => {
 router.post("/reply/add", async (req, res) => {
     let {
         message,
-        
-        
+
+
     } = req.body;
 
     // const member_address_1 = city + district + zipcode + fulladdress;
