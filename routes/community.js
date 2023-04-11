@@ -26,8 +26,8 @@ const getListData = async (req, res) => {
         search = search.trim(); // 去掉頭尾空白
 
         const searchEsc = db.escape('%' + search + '%');
-        sqlWhere += ` AND \`name\` LIKE ${searchEsc} `;
-        queryObj = { ...queryObj, search }
+        sqlWhere += ` AND \`community_header\` LIKE ${searchEsc} `;
+        queryObj = { ...queryObj, search } 
     }
 
 
