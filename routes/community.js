@@ -121,7 +121,7 @@ const getMyCommunityData = async (req, res) => {
 
 const getoneCommunityData = async (req, res) => {
     let row = []
-    const sql4 = `SELECT * FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community.\`sid\` = ${req.params.sid} `;
+    const sql4 = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community.\`sid\` = ${req.params.sid} `;
     [row] = await db.query(sql4);
 
     return {
@@ -130,22 +130,22 @@ const getoneCommunityData = async (req, res) => {
 }
 
 const getoneCommunityReply = async (req, res) => {
-    let row21 = []
+    let row21 = [] 
     let row22 = []
     const sql5 =
         `SELECT community_message.* , members.member_name, members.member_img FROM \`community_message\` 
-LEFT JOIN members on community_message.member_sid = members.sid WHERE community_message.community_sid = ${req.params.sid} `;
+LEFT JOIN members on community_message.member_sid = members.sid WHERE community_message.community_sid = ${req.params.sid} ORDER BY message_created_at DESC `;
     [row21] = await db.query(sql5);
+    const sqls = `SELECT COUNT(community_message.community_like) AS CMlike FROM community_message WHERE community_sid = ${req.params.sid} ORDER BY message_created_at DESC`;
+        [row22] = await db.query(sqls)
 
-    const sqls = `SELECT COUNT(community_message.community_like) AS CMlike FROM community_message WHERE community_sid = ${req.params.sid}`;
-    [row22] = await db.query(sqls)
+        let row2 = [...row21]
 
-    let row2 = [...row21, row22]
-
-    return {
-        row2
+        return {
+            row2
     }
-}
+    }
+
 
 
 //API路由
@@ -187,21 +187,24 @@ router.get('/data', async (req, res) => {
 
     res.json(results);
 });
-
+ 
 
 //文章單頁資料
 router.get("/:sid", async (req, res) => {
     res.json(await getoneCommunityData(req));
-});
+}); 
 
 //文章留言
 router.get("/reply/:sid", async (req, res) => {
+
     res.json(await getoneCommunityReply(req));
 });
 
 //新增文章留言
-router.post("/reply/add", async (req, res) => {
+router.post("/sent", async (req, res) => {
     let {
+        community_sid,
+        member_sid,
         message,
 
 
@@ -211,10 +214,8 @@ router.post("/reply/add", async (req, res) => {
 
     const sql =
         "INSERT INTO \`community_message\`(`community_sid`, `member_sid`, `message`) VALUES (?,?,?)";
-
     const [result] = await db.query(sql, [
         community_sid,
-        cmReply,
         member_sid,
         message
 
@@ -226,6 +227,7 @@ router.post("/reply/add", async (req, res) => {
         postData: req.body,
         result,
     });
+   
 })
 
 module.exports = router;

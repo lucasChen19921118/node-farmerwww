@@ -216,7 +216,7 @@ app.use(express.static("public")); //指定資料夾
 
 // 設定404的路由(自訂404頁面)
 app.use((req, res) => {
-  res.status(404).send("找不到頁面");
+  res.status(404).send("喔喔～找不到頁面");
 });
 
 // 設定偵聽port
