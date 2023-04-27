@@ -3,8 +3,33 @@ const express = require("express");
 const db = require("./../modules/db_connect");
 
 const router = express.Router();
+router.use(express.json());
 
 const bodyParser = require('body-parser');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+
+
+//上傳圖片
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, __dirname + '/../public/images/community');
+    },
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname);
+        const newFileName = `${uuidv4()}${ext}`;
+        cb(null, newFileName);
+    },
+});
+
+const upload = multer({ storage });
+
+router.post('/api/upload', upload.single('file'), (req, res) => {
+    console.log('後端：', req.file.filename)
+    res.send(req.file.filename);
+});
+
 
 router.use((req, res, next) => {
 
@@ -20,18 +45,55 @@ const getListData = async (req, res) => {
     let page = +req.query.page || 1;
     //-----篩選&排序&檢索------
     let queryObj = {};
+    let sqlOrder = "";
     let sqlWhere = ' WHERE 1 '; // 條件式的開頭
     let search = req.query.search;
+    let orderTime = req.query.orderTime
+    let orderHot = req.query.orderHot
+    
+    //關鍵字搜尋
     if (search && search.trim()) {
         search = search.trim(); // 去掉頭尾空白
 
         const searchEsc = db.escape('%' + search + '%');
         sqlWhere += ` AND \`community_header\` LIKE ${searchEsc} `;
-        queryObj = { ...queryObj, search } 
+        queryObj = { ...queryObj, search} 
     }
 
+    if (orderTime) {
+        switch (orderTime) {
+            case 'false':
+                queryObj = { ...queryObj, orderTime };
+                sqlOrder = ` ORDER BY community_created_at DESC`;
+                break;
+            case 'true':
+                queryObj = { ...queryObj, orderTime };
+                sqlOrder = ` ORDER BY community_created_at ASC`;
+                break;
+            case "undefined":
+                queryObj = { ...queryObj, orderTime };
+                sqlOrder = ` ORDER BY community_created_at DESC`;
+                break;
+        }
+    } else {
+        sqlOrder = ` ORDER BY community_created_at DESC`;
+    }
+
+    // if (orderHot) {
+    //     switch (orderHot) {
+    //         case 'false':
+    //             queryObj = { ...queryObj, orderTime };
+    //             sqlOrder = ` ORDER BY total_reply DESC`;
+    //             break;
+    //         case 'true':
+    //             queryObj = { ...queryObj, orderTime };
+    //             sqlOrder = ` ORDER BY total_reply ASC`;
+    //             break;
+    //     }
+    // }
 
 
+ 
     page = parseInt(page);
 
     if (page < 1) {
@@ -39,7 +101,7 @@ const getListData = async (req, res) => {
     }
     // 總筆數
     const [[{ totalRows }]] = await db.query(
-        `SELECT COUNT(1) AS totalRows FROM community ${sqlWhere}`
+        `SELECT COUNT(1) AS totalRows FROM community ${sqlWhere} ${sqlOrder} `
     );
 
     // 總頁數
@@ -49,22 +111,32 @@ const getListData = async (req, res) => {
         if (page > totalPages) {
             redirect = req.baseUrl + "?page=" + totalPages;
         }
-        const sql = `SELECT * FROM \`community\` ${sqlWhere}  LIMIT 
+        const sql = `SELECT * FROM \`community\` ${sqlWhere} ${sqlOrder}  LIMIT 
       ${(page - 1) * perPage} , ${perPage} `;
 
         [rows] = await db.query(sql);
     }
 
-    //取得所有文章列表
+    //取得所有文章列表(包含回應總數)
     let CMA = []
-    let sqlOrder = " ORDER BY community.sid DESC"
-    const sql1 = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid ${sqlWhere} ${sqlOrder}
-      LIMIT ${(page - 1) * perPage}, ${perPage}`;
+    
+// SELECT c.*, cm.community_sid, members.sid, members.member_name, COUNT(cm.community_sid) AS total_reply
+// FROM community c
+// LEFT JOIN community_message cm ON c.sid = cm.community_sid
+// LEFT JOIN members ON members.sid = c.member_sid
+// GROUP BY c.sid;
+    
+    
+    
+    const sql1 = `SELECT community.*, community_message.community_sid, members.member_name, members.member_img, COUNT(community_message.community_sid) AS total_reply FROM community community LEFT JOIN community_message  ON community.sid = community_message.community_sid LEFT JOIN members ON members.sid = community.member_sid ${sqlWhere} GROUP BY community.sid  ${sqlOrder} LIMIT ${(page - 1) * perPage}, ${perPage}`;
+    
+      // const sql1 = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid ${sqlWhere} ${sqlOrder}
+    //   LIMIT ${(page - 1) * perPage}, ${perPage}`;
     [CMA] = await db.query(sql1);
+    console.log(sql1)
+    console.log(req.query)
 
-
-
-
+  
     //取得該篇文章的按讚數
     // let communitylike = []
     // const sql2 = `SELECT COUNT(1) AS totalL FROM \`community\` JOIN community_liked ON  community.sid = community_liked.community_liked WHERE community.member_sid`;
@@ -75,7 +147,6 @@ const getListData = async (req, res) => {
 
     return {
         page,
-        rows,
         perPage,
         totalRows,
         totalPages,
@@ -146,7 +217,7 @@ LEFT JOIN members on community_message.member_sid = members.sid WHERE community_
     }
     }
 
-
+ 
 
 //API路由
 router.get("/", (req, res) => {
@@ -161,11 +232,11 @@ router.get("/api", async (req, res) => {
 //關鍵字搜尋文章標題
 router.get('/api/search', (req, res) => {
     // 獲取關鍵字參數
-    const searchTerm = req.query.searchTerm;
+    const search = req.query.search;
 
     // 編寫SQL預處理語句
     const sql = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community_header LIKE ?`;
-    const searchTermLike = `%${searchTerm}%`;
+    const searchTermLike = `%${search}%`;
 
     
     // 執行SQL查詢
@@ -177,13 +248,13 @@ router.get('/api/search', (req, res) => {
 
 router.get('/data', async (req, res) => {
     // 獲取關鍵字參數
-    const searchTerm = req.query.searchTerm;
+    const search = req.query.search;
 
     // 編寫參數化的 SQL 語句
     const sql = `SELECT community.* , members.member_name, members.member_img FROM \`community\` LEFT JOIN members ON  members.sid = community.member_sid WHERE community_header LIKE ?`;
 
     // 執行 SQL 查詢
-    const [results] = await db.query(sql, [`%${searchTerm}%`]);
+    const [results] = await db.query(sql, [`%${search}%`]);
 
     res.json(results);
 });
@@ -229,5 +300,57 @@ router.post("/sent", async (req, res) => {
     });
    
 })
+
+router.post("/delete", async (req, res) => {
+    let {
+        sid
+    } = req.body;
+
+    const output = {
+        success: false,
+        error: "",
+    };
+    if (res.locals.bearer.sid && res.locals.bearer.account) {
+        // 有登入
+        const sql = `DELETE FROM community_message WHERE sid=?`;
+            const [result] = await db.query(sql, [
+               sid
+            ]);
+            output.success = !!result.affectedRows;
+            output.error = output.success ? "" : "刪除發生錯誤";
+    } else {
+        // 沒登入
+        output.error = `沒有權限做刪除`;
+    }
+    res.json(output);
+});
+
+
+
+//新增文章
+router.post('/new/api', async (req, res) => {
+    let {
+        member_sid,
+        title,
+        message,
+        url
+    } = req.body;
+
+    const sql = "INSERT INTO \`community\`(`member_sid`,`community_picture1`,`community_header`, `community_contain`) VALUES (?,?,?,?)";
+    const [result] = await db.query(sql, [
+        member_sid,
+        url,
+        title,
+        message
+    ]);
+
+    res.json({
+        success: !!result.affectedRows,
+        postData: req.body,
+        result,
+            
+    });
+})
+
 
 module.exports = router;
