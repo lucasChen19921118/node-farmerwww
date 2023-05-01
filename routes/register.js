@@ -60,7 +60,6 @@ router.post("/add", async (req, res) => {
     ava,
   } = req.body;
 
-  console.log(ava)
 
 
   if (password == matchPassword) {
